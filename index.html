@@ -1,0 +1,1513 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>津軽為信の野望 改訂版</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#fcfcfc; --bg:#000000; --sea:#10204a; --frame:#fcfcfc;
+  --gold:#f7d51d; --red:#d82800; --blue:#3cbcfc; --green:#92cc41; --snow:#a4e4fc;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{background:var(--bg);color:var(--ink);
+  font-family:'DotGothic16','MS Gothic',monospace;
+  image-rendering:pixelated; -webkit-font-smoothing:none;}
+body{display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6px;}
+#game{width:100%;max-width:820px;}
+
+/* ===== FC窓（二重罫線） ===== */
+.win{border:4px double var(--frame);background:var(--bg);padding:8px;margin-bottom:6px;}
+.win .ttl{display:inline-block;background:var(--bg);padding:0 6px;margin-top:-18px;color:var(--gold);font-size:14px;}
+
+/* ===== 上部ステータス帯 ===== */
+#topbar{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;border:4px double var(--frame);padding:6px 8px;margin-bottom:6px;}
+#topbar b{color:var(--gold);}
+#phasestrip{display:flex;flex-wrap:wrap;gap:2px;font-size:11px;margin-top:4px;width:100%;}
+#phasestrip span{padding:1px 4px;border:1px solid #555;color:#888;}
+#phasestrip span.cur{border-color:var(--gold);color:var(--gold);background:#332b00;}
+#phasestrip span.snowp{text-decoration:underline;}
+
+/* ===== マップ ===== */
+#mapwrap{overflow-x:auto;border:4px double var(--frame);margin-bottom:6px;background:var(--sea);}
+#map{position:relative;width:780px;height:560px;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 15px,rgba(255,255,255,.03) 15px 16px),
+    var(--sea);}
+.prov{position:absolute;width:62px;height:44px;border:2px solid #000;
+  font-size:10px;line-height:1.1;text-align:center;cursor:pointer;
+  display:flex;flex-direction:column;justify-content:center;color:#000;padding:1px;}
+.prov .kn{font-size:11px;font-weight:bold;}
+.prov .ie{font-size:9px;}
+.prov.sel{outline:3px solid var(--gold);z-index:5;}
+.prov.cand{outline:3px dashed var(--ink);z-index:4;}
+.prov.snowed::after{content:"雪";position:absolute;top:-2px;right:-2px;background:var(--snow);color:#000;font-size:9px;padding:0 2px;}
+.prov.me{box-shadow:0 0 0 2px var(--gold) inset;}
+
+/* ===== メッセージ・メニュー ===== */
+#msg{min-height:84px;font-size:14px;line-height:1.6;white-space:pre-wrap;}
+#menu{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+button{font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);
+  border:2px solid var(--ink);padding:6px 12px;cursor:pointer;}
+button:hover,button:focus-visible{background:var(--ink);color:var(--bg);outline:none;}
+button.acc{border-color:var(--gold);color:var(--gold);}
+button.acc:hover{background:var(--gold);color:#000;}
+button:disabled{border-color:#444;color:#444;cursor:default;}
+button:disabled:hover{background:var(--bg);}
+#log{font-size:12px;color:#9a9a9a;max-height:90px;overflow-y:auto;line-height:1.5;}
+
+/* ===== 戦闘画面（士気主役） ===== */
+#battle{display:none;}
+#weather{text-align:center;font-size:13px;color:var(--snow);margin-bottom:4px;letter-spacing:1px;}
+
+/* 士気ゲージ（画面最上部・主役） */
+#morale-zone{border:4px double var(--frame);padding:10px 12px;margin-bottom:6px;background:#0a0a14;}
+.mrow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px;}
+.mrow .side{width:96px;font-weight:bold;}
+.mrow.atk .side{color:var(--blue);} .mrow.def .side{color:var(--red);}
+.mbar{flex:1;height:20px;border:2px solid var(--ink);position:relative;background:#000;overflow:hidden;}
+.mbar i{display:block;height:100%;transition:width .4s steps(8);}
+.mrow.atk .mbar i{background:linear-gradient(90deg,#1c5fb0,var(--blue));}
+.mrow.def .mbar i{background:linear-gradient(90deg,#8a1c00,var(--red));}
+.mbar .mtxt{position:absolute;right:4px;top:1px;font-size:12px;color:#fff;text-shadow:1px 1px 0 #000;}
+.mdelta{width:54px;text-align:center;font-size:14px;font-weight:bold;}
+.mdelta.up{color:var(--green);} .mdelta.down{color:#ff5a4d;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-3px);}75%{transform:translateX(3px);}}
+.shaking{animation:shake .25s steps(2) 2;}
+@media (prefers-reduced-motion: reduce){.shaking{animation:none;}.mbar i{transition:none;}}
+
+/* 陣形フィールド（右備え・中央・左備え・後詰め） */
+#bfield{border:4px double var(--frame);background:#16241a;padding:8px;margin-bottom:6px;}
+.formation{display:flex;justify-content:space-between;gap:6px;}
+.side-block{flex:1;}
+.side-block > .blab{font-size:11px;text-align:center;margin-bottom:3px;}
+.side-block.atk > .blab{color:var(--blue);} .side-block.def > .blab{color:var(--red);}
+.cols{display:flex;gap:4px;}
+.fcol{flex:1;text-align:center;}
+.fcol h4{font-size:10px;color:#8fae8f;margin-bottom:3px;letter-spacing:1px;}
+.unit{border:2px solid #3a5a3a;background:#0c160c;margin:3px 0;padding:3px 2px;font-size:10px;position:relative;}
+.unit.front{border-color:var(--gold);}
+.unit.fallen{opacity:.3;border-style:dashed;}
+.unit .face{width:24px;height:24px;margin:0 auto 2px;border:1px solid #000;image-rendering:pixelated;display:block;}
+.unit .un-nm{font-size:10px;line-height:1.1;}
+.unit .un-hei{color:var(--gold);font-size:10px;}
+.unit.lead::after{content:"★";position:absolute;top:-3px;left:-2px;color:var(--gold);font-size:10px;}
+.vs-mark{align-self:center;font-size:16px;color:var(--gold);padding:0 2px;}
+
+/* ===== 一騎打ち（専用シーン） ===== */
+#duel{display:none;}
+#duel-stage{border:4px double var(--frame);
+  background:
+    repeating-linear-gradient(180deg,#3a1a10 0 2px,#2a1208 2px 4px),
+    linear-gradient(180deg,#5a2810 0%,#8a4018 38%,#c87038 60%,#e8a850 100%);
+  padding:14px 10px 10px;position:relative;overflow:hidden;}
+#duel-stage::before{content:"";position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  width:46px;height:46px;border-radius:50%;background:#fce8c0;box-shadow:0 0 24px 10px rgba(252,232,192,.5);}
+.duelists{display:flex;justify-content:space-between;align-items:flex-end;position:relative;z-index:2;min-height:160px;}
+.duelist{width:42%;text-align:center;}
+.duelist img{width:120px;height:120px;image-rendering:pixelated;display:block;margin:0 auto;
+  filter:drop-shadow(3px 3px 0 rgba(0,0,0,.6));}
+.duelist.right img{transform:scaleX(-1);}
+.duelist .dn{font-size:14px;margin-top:4px;color:#fff;text-shadow:2px 2px 0 #000;}
+.duelist.left .dn{color:var(--blue);} .duelist.right .dn{color:#ff8a7a;}
+.duelist .dhp{height:12px;border:2px solid #000;background:#400;margin:4px auto 0;width:110px;}
+.duelist .dhp i{display:block;height:100%;background:linear-gradient(90deg,#d82800,#f7d51d);transition:width .3s steps(6);}
+.clash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3;
+  font-size:46px;color:#fff;text-shadow:0 0 12px #ff0,3px 3px 0 #b00;opacity:0;pointer-events:none;}
+@keyframes clashfx{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-15deg);}
+  40%{opacity:1;transform:translate(-50%,-50%) scale(1.3) rotate(8deg);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.6) rotate(0);}}
+.clash.go{animation:clashfx .5s steps(6) forwards;}
+@keyframes lunge-l{0%,100%{transform:translateX(0);}50%{transform:translateX(28px);}}
+@keyframes lunge-r{0%,100%{transform:scaleX(-1) translateX(0);}50%{transform:scaleX(-1) translateX(28px);}}
+.duelist.left.attack img{animation:lunge-l .35s steps(3);}
+.duelist.right.attack img{animation:lunge-r .35s steps(3);}
+@media (prefers-reduced-motion: reduce){.clash.go,.duelist.attack img{animation:none;}.clash.go{opacity:1;}}
+#duel-msg{min-height:56px;font-size:15px;line-height:1.6;white-space:pre-wrap;}
+
+/* ===== タイトル ===== */
+#title{text-align:center;padding:40px 10px;}
+#title h1{font-size:34px;color:var(--gold);letter-spacing:4px;text-shadow:3px 3px 0 var(--red);}
+#title h2{font-size:14px;margin:10px 0 30px;color:var(--snow);}
+#title p{font-size:12px;color:#888;margin-top:30px;}
+.blink{animation:bl 1s steps(1) infinite;}
+@keyframes bl{50%{opacity:0;}}
+@media (prefers-reduced-motion: reduce){.blink{animation:none;}}
+
+/* ===== 大名選択 ===== */
+#select{display:none;}
+#dlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px;font-size:12px;}
+#dlist button{padding:4px;font-size:12px;text-align:left;}
+#bonus{display:none;font-size:14px;}
+.statrow{display:flex;align-items:center;gap:8px;margin:6px 0;}
+.statrow .nm{width:80px;}
+.statrow .vl{width:30px;text-align:center;color:var(--gold);}
+.statrow button{padding:2px 10px;}
+
+#main{display:none;}
+.hide{display:none !important;}
+table.inf{font-size:12px;border-collapse:collapse;margin-top:4px;}
+table.inf td,table.inf th{border:1px solid #444;padding:2px 6px;}
+</style>
+</head>
+<body>
+<div id="game">
+
+  <!-- タイトル画面 -->
+  <div id="title" class="win">
+    <h1>津軽為信の野望</h1>
+    <h2>〜 奥州統一 〜</h2>
+    <p style="color:#ccc;font-size:13px;">時は天正元年　奥羽の地に十家割拠す<br>
+    雪深き津軽より　奥州統一の野望はじまる</p>
+    <p class="blink" style="font-size:14px;color:var(--ink);">PUSH START</p>
+    <div id="menu-title" style="margin-top:16px;">
+      <button class="acc" onclick="G.toSelect()">はじめる</button>
+    </div>
+    <p>© 2026 No Existe ／ 1988年FC戦国SLGへのオマージュ（システム再現・全グラフィック自作）</p>
+  </div>
+
+  <!-- 大名選択 -->
+  <div id="select" class="win">
+    <span class="ttl">大名選択</span>
+    <p style="font-size:13px;margin:6px 0;">いずれの家にて奥州を狙うか（津軽家＝津軽為信が主役）</p>
+    <div id="dlist"></div>
+  </div>
+
+  <!-- 能力ボーナス配分 -->
+  <div id="bonus" class="win">
+    <span class="ttl">能力配分</span>
+    <p id="bname" style="margin:6px 0;color:var(--gold);"></p>
+    <p style="font-size:12px;color:#aaa;">ボーナス <b id="bpts" style="color:var(--gold);">10</b> 点を配分せよ（各能力 最大7）</p>
+    <div id="brows"></div>
+    <div id="menu-bonus" style="margin-top:10px;">
+      <button class="acc" onclick="G.startGame()">出陣</button>
+    </div>
+  </div>
+
+  <!-- メイン画面 -->
+  <div id="main">
+    <div id="topbar">
+      <span>年: <b id="t-year"></b></span>
+      <span>家: <b id="t-ie"></b></span>
+      <span>金: <b id="t-kane"></b></span>
+      <span>領国: <b id="t-prov"></b></span>
+      <span>総兵: <b id="t-hei"></b></span>
+      <div id="phasestrip"></div>
+    </div>
+    <div id="mapwrap"><div id="map"></div></div>
+    <div class="win">
+      <span class="ttl" id="phname">フェイズ</span>
+      <div id="msg"></div>
+      <div id="menu"></div>
+    </div>
+    <div class="win"><span class="ttl">記録</span><div id="log"></div></div>
+  </div>
+
+  <!-- 戦闘画面 -->
+  <div id="battle">
+    <div id="weather"></div>
+    <div id="morale-zone">
+      <div class="mrow atk"><span class="side" id="ma-name">攻手</span>
+        <div class="mbar"><i id="ma-bar" style="width:100%"></i><span class="mtxt" id="ma-txt"></span></div>
+        <span class="mdelta" id="ma-d"></span></div>
+      <div class="mrow def"><span class="side" id="md-name">守手</span>
+        <div class="mbar"><i id="md-bar" style="width:100%"></i><span class="mtxt" id="md-txt"></span></div>
+        <span class="mdelta" id="md-d"></span></div>
+    </div>
+    <div id="bfield">
+      <div class="formation">
+        <div class="side-block atk"><div class="blab" id="ba-lab"></div>
+          <div class="cols">
+            <div class="fcol"><h4>右備</h4><div id="a-r"></div></div>
+            <div class="fcol"><h4>中央</h4><div id="a-c"></div></div>
+            <div class="fcol"><h4>左備</h4><div id="a-l"></div></div>
+            <div class="fcol"><h4>後詰</h4><div id="a-rear"></div></div>
+          </div></div>
+        <div class="vs-mark">⚔</div>
+        <div class="side-block def"><div class="blab" id="bd-lab"></div>
+          <div class="cols">
+            <div class="fcol"><h4>右備</h4><div id="d-r"></div></div>
+            <div class="fcol"><h4>中央</h4><div id="d-c"></div></div>
+            <div class="fcol"><h4>左備</h4><div id="d-l"></div></div>
+            <div class="fcol"><h4>後詰</h4><div id="d-rear"></div></div>
+          </div></div>
+      </div>
+    </div>
+    <div class="win">
+      <span class="ttl" id="bt-ttl">合戦</span>
+      <div id="bmsg" style="min-height:70px;font-size:14px;line-height:1.6;white-space:pre-wrap;"></div>
+      <div id="bmenu" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <!-- 一騎打ちシーン -->
+  <div id="duel">
+    <div id="duel-stage">
+      <div class="duelists">
+        <div class="duelist left" id="duel-L">
+          <img id="dl-face" src="" alt="">
+          <div class="dn" id="dl-name"></div>
+          <div class="dhp"><i id="dl-hp" style="width:100%"></i></div>
+        </div>
+        <div class="clash" id="clashfx">斬</div>
+        <div class="duelist right" id="duel-R">
+          <img id="dr-face" src="" alt="">
+          <div class="dn" id="dr-name"></div>
+          <div class="dhp"><i id="dr-hp" style="width:100%"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="win">
+      <span class="ttl">一騎打ち</span>
+      <div id="duel-msg"></div>
+      <div id="duel-menu" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+/* ============================================================
+   津軽為信の野望 改訂版
+   レトロ風シミュレーションとして全コード自作
+   ============================================================ */
+
+// ---- 奥州10カ国データ（独自設定・史実人物ベース） ----
+// [id,国,家,武将[[名,兵]..],石高,石高上限,城,金,砲,col,row,隣接id[],雪]
+const RAW = [
+[1,"蝦夷","松前家",[["蠣崎慶広",3]],30,60,12,22,0, 5.2,0.2,[2],1],
+[2,"津軽","津軽家",[["津軽為信",4],["兼平綱則",2],["森岡信元",2]],45,95,18,42,0, 3.6,1.3,[1,3,4],1],
+[3,"糠部","南部家",[["南部晴政",6],["南部信直",4],["北信愛",3]],95,150,30,55,1, 6.2,1.4,[2,4,5,7],1],
+[4,"秋田","安東家",[["安東愛季",5],["湊通季",3]],72,120,20,46,0, 2.0,2.7,[2,3,6],1],
+[5,"陸中","斯波家",[["斯波詮直",2],["高水寺義道",1]],35,60,12,24,0, 7.4,2.7,[3,7,8],0],
+[6,"庄内","最上家",[["最上義守",4],["最上義光",3],["氏家守棟",2]],78,125,18,44,0, 2.3,4.1,[4,7,9],0],
+[7,"仙台","伊達家",[["伊達輝宗",5],["伊達政宗",2],["鬼庭良直",3],["片倉景綱",2]],120,175,26,58,1, 5.0,3.9,[3,5,6,8,9,10],0],
+[8,"三陸","葛西家",[["葛西晴信",3]],40,70,14,26,0, 7.6,3.9,[5,7],0],
+[9,"会津","蘆名家",[["蘆名盛氏",6],["富田氏実",3]],100,155,28,52,1, 3.9,5.3,[6,7,10],0],
+[10,"常陸","佐竹家",[["佐竹義重",7],["佐竹義宣",3]],110,165,24,52,1, 6.4,5.6,[7,9],0]
+];
+
+// 初期同盟（家名ペア）— 伊達と最上は縁戚、蘆名と佐竹は南奥の盟約
+const ALLY0 = [["伊達家","最上家"],["蘆名家","佐竹家"]];
+
+// 武将のプリセット能力 [作戦,戦闘,政治,カリスマ,忠誠]（独自設定）
+const FAMOUS = {
+"津軽為信":[6,5,6,6,9],"兼平綱則":[4,5,4,4,8],"森岡信元":[4,4,5,4,7],
+"南部晴政":[5,5,4,5,9],"南部信直":[5,5,5,4,5],"北信愛":[5,4,5,5,8],
+"安東愛季":[6,5,6,6,9],"湊通季":[3,4,3,3,4],
+"斯波詮直":[3,3,4,3,9],"高水寺義道":[2,3,3,3,8],
+"最上義守":[4,4,5,5,9],"最上義光":[7,5,6,5,7],"氏家守棟":[6,4,5,4,7],
+"伊達輝宗":[5,4,6,6,9],"伊達政宗":[7,6,5,6,7],"鬼庭良直":[4,6,3,5,8],"片倉景綱":[6,4,6,4,8],
+"葛西晴信":[4,4,4,4,9],
+"蘆名盛氏":[6,5,6,6,9],"富田氏実":[4,5,4,4,7],
+"佐竹義重":[6,7,5,6,9],"佐竹義宣":[5,5,5,5,7]};
+
+// 名前から安定的に能力を生成（簡易ハッシュ）
+function hashStat(name,salt){let h=salt;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h;}
+function mkBusho(name,hei,isDaimyo){
+  const f=FAMOUS[name];
+  const r=i=>1+hashStat(name,i)%7;
+  return {name, hei,
+    saku: f?f[0]:r(11), sen: f?f[1]:r(23), sei: f?f[2]:r(37),
+    kari: f?f[3]:r(53), chu: isDaimyo?9:(f?f[4]:1+hashStat(name,71)%9),
+    un: 2+hashStat(name,97)%29, alive:true};
+}
+</script>
+<script>
+// ============ 状態・初期化 ============
+const SNOW_PHASES=[7,8]; // 移動3・戦争3
+const PHASES=["経略","税収","移動一","戦争一","政略","移動二","戦争二","移動三","戦争三","軍備"];
+let S=null; // ゲーム状態
+const $=id=>document.getElementById(id);
+const rnd=n=>Math.floor(Math.random()*n);
+const r2=(a,b)=>a+Math.random()*(b-a);
+
+function newState(playerIe){
+  const provs = RAW.map(d=>({
+    id:d[0],kuni:d[1],ie:d[2],
+    busho:d[3].map((b,i)=>mkBusho(b[0],b[1],i===0)),
+    koku:d[4],kokuMax:d[5],shiro:d[6],teppo:d[8],
+    col:d[9],row:d[10],adj:d[11],snow:!!d[12],owner:d[2]
+  }));
+  const clans={};
+  provs.forEach(p=>{ if(!clans[p.ie]) clans[p.ie]={ie:p.ie,kane:0,daimyo:p.busho[0],alive:true,kani:0,houroku:1,allies:new Set()}; clans[p.ie].kane+=RAW[p.id-1][7]; });
+  ALLY0.forEach(([a,b])=>{clans[a].allies.add(b);clans[b].allies.add(a);});
+  return {provs,clans,player:playerIe,year:1573,phase:0,ronin:[],
+    moved:new Set(),sel:null,mode:null,taxDone:false};
+}
+const clanProvs=ie=>S.provs.filter(p=>p.owner===ie);
+const provHei=p=>p.busho.reduce((s,b)=>s+b.hei,0);
+const myClan=()=>S.clans[S.player];
+
+// ============ オーディオ（矩形波ピコピコ） ============
+let AC=null;
+function beep(f,d=0.06,type="square",v=0.04){
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type=type;o.frequency.value=f;g.gain.value=v;
+    o.connect(g);g.connect(AC.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);
+    o.stop(AC.currentTime+d);}catch(e){}
+}
+const seSel=()=>beep(880,0.04), seOk=()=>{beep(660,.05);setTimeout(()=>beep(990,.07),60);},
+      seNg=()=>beep(180,.12), seWar=()=>{beep(220,.1,"sawtooth",.05);setTimeout(()=>beep(180,.15,"sawtooth",.05),100);};
+
+// ============ 画面遷移 ============
+const G={};
+G.toSelect=function(){ seOk();
+  $("title").style.display="none"; $("select").style.display="block";
+  const dl=$("dlist"); dl.innerHTML="";
+  RAW.forEach(d=>{
+    const b=document.createElement("button");
+    b.textContent=`${d[2]}（${d[1]}）`;
+    if(d[2]==="津軽") b.classList.add("acc");
+    b.onclick=()=>G.toBonus(d[2]);
+    dl.appendChild(b);
+  });
+};
+let bonusLeft=10, bonusStats=null, chosenIe=null;
+G.toBonus=function(ie){ seOk(); chosenIe=ie;
+  $("select").style.display="none"; $("bonus").style.display="block";
+  const d=RAW.find(r=>r[2]===ie); const dm=mkBusho(d[3][0][0],d[3][0][1],true);
+  bonusStats={saku:dm.saku,sen:dm.sen,sei:dm.sei,kari:dm.kari};
+  baseStats[chosenIe]={...bonusStats};
+  bonusLeft=10;
+  $("bname").textContent=`${ie}家当主　${dm.name}`;
+  renderBonus();
+};
+function renderBonus(){
+  $("bpts").textContent=bonusLeft;
+  const labels={saku:"さくせん",sen:"せんとう",sei:"せいじ",kari:"かりすま"};
+  $("brows").innerHTML="";
+  for(const k in labels){
+    const row=document.createElement("div"); row.className="statrow";
+    row.innerHTML=`<span class="nm">${labels[k]}</span>
+      <button onclick="G.bAdj('${k}',-1)">－</button>
+      <span class="vl">${bonusStats[k]}</span>
+      <button onclick="G.bAdj('${k}',1)">＋</button>`;
+    $("brows").appendChild(row);
+  }
+}
+const baseStats={};
+G.bAdj=function(k,d){
+  if(d>0 && (bonusLeft<=0||bonusStats[k]>=7)) return seNg();
+  const base=baseStats[chosenIe][k]; // 下げられるのは自分で足した分だけ
+  if(d<0 && bonusStats[k]<=base) return seNg();
+  bonusStats[k]+=d; bonusLeft-=d; seSel(); renderBonus();
+};
+G.startGame=function(){
+  seOk(); S=newState(chosenIe);
+  const dm=S.clans[chosenIe].daimyo;
+  Object.assign(dm,bonusStats);
+  $("bonus").style.display="none"; $("main").style.display="block";
+  log(`天正元年　${chosenIe}家の戦いが始まった`);
+  buildMap(); startPhase();
+};
+
+// ============ マップ描画 ============
+const CLAN_COLORS=["#d82800","#3cbcfc","#92cc41","#f7d51d","#fc74b4","#f87858",
+"#00a800","#a4e4fc","#fcbcb0","#b8b8f8","#e45c10","#58d854","#fcfcfc","#d8a038"];
+const colorOf={};
+function clanColor(ie){
+  if(!colorOf[ie]){ colorOf[ie]=CLAN_COLORS[Object.keys(colorOf).length%CLAN_COLORS.length]; }
+  return colorOf[ie];
+}
+function buildMap(){
+  const m=$("map"); m.innerHTML="";
+  S.provs.forEach(p=>{
+    const el=document.createElement("div");
+    el.className="prov"; el.id="pv"+p.id;
+    el.style.left=(p.col*66)+"px"; el.style.top=(p.row*66)+"px";
+    el.onclick=()=>provClick(p.id);
+    m.appendChild(el);
+  });
+  renderMap();
+}
+function renderMap(){
+  const snowNow=SNOW_PHASES.includes(S.phase);
+  S.provs.forEach(p=>{
+    const el=$("pv"+p.id);
+    el.style.background=clanColor(p.owner);
+    el.classList.toggle("me",p.owner===S.player);
+    el.classList.toggle("snowed",snowNow&&p.snow);
+    el.classList.toggle("sel",S.sel===p.id);
+    el.classList.toggle("cand",!!(S.cands&&S.cands.includes(p.id)));
+    el.innerHTML=`<span class="kn">${p.kuni}</span><span class="ie">${p.owner} 兵${provHei(p)}</span>`;
+  });
+  // 上部帯
+  $("t-year").textContent=S.year+"年";
+  $("t-ie").textContent=S.player;
+  $("t-kane").textContent=myClan().kane;
+  $("t-prov").textContent=clanProvs(S.player).length+"国";
+  $("t-hei").textContent=clanProvs(S.player).reduce((s,p)=>s+provHei(p),0);
+  const ps=$("phasestrip"); ps.innerHTML="";
+  PHASES.forEach((nm,i)=>{
+    const sp=document.createElement("span"); sp.textContent=nm;
+    if(i===S.phase)sp.classList.add("cur");
+    if(SNOW_PHASES.includes(i))sp.classList.add("snowp");
+    ps.appendChild(sp);
+  });
+}
+function log(t){ const l=$("log"); l.innerHTML=`<div>◆ ${t}</div>`+l.innerHTML; }
+function msg(t){ $("msg").textContent=t; }
+function menu(items){ // [[label,fn,acc?],...]
+  const m=$("menu"); m.innerHTML="";
+  items.forEach(([lb,fn,acc])=>{
+    const b=document.createElement("button");
+    b.textContent=lb; if(acc)b.classList.add("acc");
+    b.onclick=()=>{seSel();fn();};
+    m.appendChild(b);
+  });
+}
+
+// ============ フェイズ進行 ============
+function startPhase(){
+  S.sel=null;S.cands=null;S.mode=null;S.moved.clear();
+  renderMap();
+  const nm=PHASES[S.phase]; $("phname").textContent=`第${"一二三四五六七八九十"[S.phase]}段　${nm}`;
+  const snowNote=SNOW_PHASES.includes(S.phase)?"\n※雪：蝦夷・津軽・糠部・秋田の北国は雪に閉ざされ動けない":"";
+  if(nm==="経略") phKeiryaku();
+  else if(nm==="税収") phZeishu();
+  else if(nm.startsWith("移動")) phIdo(snowNote);
+  else if(nm.startsWith("戦争")) phSenso(snowNote);
+  else if(nm==="政略") phSeiryaku();
+  else if(nm==="軍備") phGunbi();
+}
+function nextPhase(){
+  S.phase++;
+  if(S.phase>=PHASES.length){ endOfYear(); return; }
+  startPhase();
+}
+
+// ---- 経略 ----
+function phKeiryaku(){
+  msg("金を投じて石高を上げる（武将の居る国とその隣国）。\n自国: 金1＝石高1（15金まで効率良）");
+  S.mode="keiryaku";
+  S.cands=clanProvs(S.player).filter(p=>p.koku<p.kokuMax).map(p=>p.id);
+  renderMap();
+  menu([["国を選んで実行",()=>msg("地図で自国を選べ"),false],["何もしない（次へ）",nextPhase,true]]);
+}
+// 原作の経略逓減式: 1-15金=1:1, 16-45=超過1/2, 46-105=1/4, 106-225=1/8...
+function keiryakuGain(kane){
+  const tiers=[[15,1],[30,2],[60,4],[120,8],[240,16],[480,32]];
+  let g=0,rem=kane;
+  for(const [width,div] of tiers){
+    if(rem<=0)break;
+    const use=Math.min(rem,width);
+    g+=Math.floor(use/div); rem-=use;
+  }
+  if(rem>0)g+=Math.floor(rem/64);
+  return g;
+}
+function doKeiryaku(p){
+  const opts=[5,15,30,45].filter(v=>v<=myClan().kane);
+  if(!opts.length){seNg();return msg("金が足りぬ");}
+  msg(`${p.kuni}（石高${p.koku}/${p.kokuMax}）にいくら投じる？\n※15金まで1金=石高1。それ以上は効率が落ちる`);
+  menu(opts.map(v=>[`金${v}（石高+${Math.min(keiryakuGain(v),p.kokuMax-p.koku)}）`,()=>{
+    myClan().kane-=v;
+    const up=Math.min(keiryakuGain(v), p.kokuMax-p.koku);
+    p.koku+=up; seOk(); log(`${p.kuni}の石高 +${up}（→${p.koku}）`);
+    phKeiryaku();
+  }]).concat([["やめる",phKeiryaku]]));
+}
+
+// ---- 税収 ----
+function phZeishu(){
+  msg("年貢を徴収する。\n税収＝石高＋重税分−兵×2−俸禄。重税は一揆の危険がある（普通徴収なら一揆なし）。");
+  menu([["普通に徴収",()=>collectTax(0),true]].concat(
+    [1,2,3,4,5,6].map(n=>[`重税${n}`,()=>collectTax(n)])));
+}
+function collectTax(lv){
+  // ---- 天災・慶事イベント（豊作/凶作のみ石高に倍率、他は石高増減）----
+  let ev=null, mult=1;
+  const roll=rnd(100);
+  if(roll<7){ev="豊作";mult=2;} else if(roll<13){ev="凶作";mult=0.5;}
+  else if(roll<16){ev="飢饉";mult=0.3;}
+  else if(roll<19){ev="台風";clanProvs(S.player).forEach(p=>p.koku=Math.max(0,p.koku-Math.ceil(p.koku*0.08)));}
+  else if(roll<23){ev="貿易";clanProvs(S.player).forEach(p=>p.koku=Math.min(p.kokuMax,p.koku+Math.ceil(p.koku*0.08)));}
+
+  // ---- 税収＝石高(豊凶補正)×1.4＋重税分−兵×1−俸禄（金が貯まりやすい設定）----
+  const kokuSum=clanProvs(S.player).reduce((s,p)=>s+p.koku,0);
+  let ikki=false;
+  // 一揆は重税時のみ。確率はレベルに比例（緩め: lv*6%）
+  if(lv>0 && rnd(100)<lv*6){ ikki=true; }
+  const base=Math.floor(kokuSum*mult*1.4);
+  const jusisei = ikki ? 0 : (lv>0 ? base + lv*5 : base);
+  let income = ikki ? lv*3 : jusisei;
+  if(ikki){ clanProvs(S.player).forEach(p=>p.koku=Math.max(0,p.koku-lv)); }
+
+  // ---- 支出: 兵×1 ＋ 俸禄(武将数×俸禄レベル)（維持費が軽い）----
+  const heiAll=clanProvs(S.player).reduce((s,p)=>s+provHei(p),0);
+  const bushoN=clanProvs(S.player).reduce((s,p)=>s+p.busho.length,0);
+  const cost=heiAll*1 + bushoN*myClan().houroku;
+  myClan().kane=Math.max(0,myClan().kane+income-cost);
+
+  let t=`石高 ${kokuSum}　→　収入 ${income}\n支出 ${cost}（兵${heiAll}×1 ＋ 俸禄${myClan().houroku}×武将${bushoN}）\n差引 ${income-cost>=0?'+':''}${income-cost}`;
+  if(ev)t=`【${ev}】\n`+t;
+  if(ikki)t+="\n一揆勃発！石高分の年貢が失われた…";
+  if(ev)log(`イベント: ${ev}`); if(ikki)log("一揆発生！");
+  yearlyFate();
+  msg(t); seOk(); renderMap();
+  menu([["次へ",nextPhase,true]]);
+}
+// 寿命・出奔チェック（税収時にまとめて）
+function yearlyFate(){
+  const h=myClan().houroku;
+  clanProvs(S.player).forEach(p=>{
+    p.busho=p.busho.filter(b=>{
+      if(b!==myClan().daimyo && rnd(100)<2 && b.un<8){log(`${b.name}、寿命にて死去`);return false;}
+      // 出奔: 忠誠が低く俸禄が低いほど起きやすい。俸禄9なら実質起きない
+      if(b!==myClan().daimyo && b.chu<=3 && rnd(100) < Math.max(0,6-h)){log(`${b.name}が出奔した！`);S.ronin.push(b);return false;}
+      return true;
+    });
+  });
+}
+
+// ---- 移動 ----
+function phIdo(note){
+  const snowNow=SNOW_PHASES.includes(S.phase);
+  msg("武将と兵を隣の自国へ移す。"+note);
+  S.mode="move-src";
+  S.cands=clanProvs(S.player).filter(p=>p.busho.length>0&&!(snowNow&&p.snow)).map(p=>p.id);
+  renderMap();
+  menu([["移動しない（次へ）",nextPhase,true]]);
+}
+function moveSelectDest(src){
+  const snowNow=SNOW_PHASES.includes(S.phase);
+  S.sel=src.id; S.mode="move-dst";
+  S.cands=src.adj.filter(i=>{const q=S.provs[i-1];
+    return q.owner===S.player&&!(snowNow&&q.snow);});
+  renderMap();
+  if(!S.cands.length){seNg();msg(`${src.kuni}から移れる自国が無い`);return phIdo("");}
+  msg(`${src.kuni}からどこへ移る？（点線の国を選べ）`);
+  menu([["やめる",()=>phIdo("")]]);
+}
+function doMove(src,dst){
+  msg(`誰を${dst.kuni}へ移す？（武将は手勢ごと移動）`);
+  const items=src.busho.map((b,i)=>[`${b.name}（兵${b.hei}）`,()=>{
+    dst.busho.push(b); src.busho.splice(i,1);
+    seOk(); log(`${b.name}、${src.kuni}→${dst.kuni}へ移動`);
+    renderMap();
+    if(src.busho.length) doMove(src,dst); else phIdo("");
+  }]);
+  items.push(["全員移動",()=>{
+    dst.busho.push(...src.busho); src.busho.length=0;
+    seOk(); log(`${src.kuni}の全軍が${dst.kuni}へ移動`); renderMap(); phIdo("");
+  },true]);
+  items.push(["やめる",()=>phIdo("")]);
+  menu(items);
+}
+
+// ---- 戦争（選択部） ----
+function phSenso(note){
+  const snowNow=SNOW_PHASES.includes(S.phase);
+  msg("隣国へ攻め込む。出兵費＝兵×1の金。"+note);
+  S.mode="war-src";
+  S.cands=clanProvs(S.player).filter(p=>provHei(p)>0&&!(snowNow&&p.snow)).map(p=>p.id);
+  renderMap();
+  menu([["戦わない（次へ）",nextPhase,true]]);
+}
+function warSelectTarget(src){
+  const snowNow=SNOW_PHASES.includes(S.phase);
+  S.sel=src.id; S.mode="war-dst";
+  S.cands=src.adj.filter(i=>{const q=S.provs[i-1];
+    return q.owner!==S.player&&!(snowNow&&q.snow)&&!myClan().allies.has(q.owner);});
+  renderMap();
+  if(!S.cands.length){seNg();msg("攻められる隣国が無い（同盟国には攻め込めない）");return phSenso("");}
+  msg(`${src.kuni}からどこへ攻める？`);
+  menu([["やめる",()=>phSenso("")]]);
+}
+function provClick(id){
+  const p=S.provs[id-1];
+  if(S.mode==="keiryaku" && S.cands&&S.cands.includes(id)) return doKeiryaku(p);
+  if(S.mode==="move-src" && S.cands.includes(id)) return moveSelectDest(p);
+  if(S.mode==="move-dst" && S.cands.includes(id)) return doMove(S.provs[S.sel-1],p);
+  if(S.mode==="war-src" && S.cands.includes(id)) return warSelectTarget(p);
+  if(S.mode==="war-dst" && S.cands.includes(id)) return confirmWar(S.provs[S.sel-1],p);
+  if(S.mode==="gunbi" && S.cands.includes(id)) return gunbiMenu(p);
+  // 情報表示（偵察: 自国無料・敵国は政治+1金 ※v4は簡易無料表示）
+  msg(`【${p.kuni}】${p.owner}家　石高${p.koku}/${p.kokuMax}　城${p.shiro}　砲${p.teppo}\n`+
+    p.busho.map(b=>`${b.name} 兵${b.hei} 作${b.saku}戦${b.sen}政${b.sei}`).join("／"));
+}
+function confirmWar(src,dst){
+  const cost=provHei(src)*1;
+  if(myClan().kane<cost){seNg();return msg(`出兵には金${cost}が要る（不足）`);}
+  msg(`${src.kuni}（兵${provHei(src)}）→${dst.kuni}（${dst.owner}家・兵${provHei(dst)}）\n出兵費 金${cost}。攻めるか？`);
+  menu([["攻め込む",()=>{myClan().kane-=cost;startBattle(src,dst,true);},true],
+        ["やめる",()=>phSenso("")]]);
+}
+</script>
+<script>
+// ============ 合戦（士気主役の野戦 → 攻城戦） ============
+/* 戦術パートの実装:
+   勝敗条件5つ: 兵0 / 士気0 / 総大将討死 / 退却 / 包囲時の中核(中央+後詰)兵0
+   陣形: 突撃=兵削り / 包囲=敵士気を多く削る / 挟み撃ち=別働隊で士気回復 / 奇襲=成功で一方的・失敗で自軍士気激減
+   後詰め: 兵多い武将なら士気回復、兵少ない武将を出すと逆効果
+   士気は両軍常時表示、毎ターンの増減を数字で見せる
+*/
+let B=null;
+
+// 兵質（大名家ごとの野戦の強さ・攻略3編準拠 15最強〜11最弱）
+const HEISHITSU={
+"南部家":14,"佐竹家":14,
+"津軽家":13,"伊達家":13,"最上家":13,"蘆名家":13,"安東家":13,
+"葛西家":12,"松前家":12,
+"斯波家":11};
+const heishitsu=ie=>HEISHITSU[ie]||12;
+
+function startBattle(src,dst,playerIsAtk){
+  seWar();
+  const rain=rnd(100)<28;
+  // 軍の構築: 武将を陣立て（中央=総大将含む前線、右備/左備、後詰=控え）
+  const a=buildArmy(src.busho, src.owner, src.teppo);
+  const d=buildArmy(dst.busho, dst.owner, dst.teppo);
+  src.teppo=0; // 鉄砲は持ち出し
+  B={src,dst,playerIsAtk,rain,a,d,turn:1,tactic:null,timer:0,over:false,
+     prevA:a.morale,prevD:d.morale};
+  $("main").style.display="none"; $("battle").style.display="block";
+  $("weather").textContent=`天候 ${rain?"雨 ☂ — 鉄砲使えず・奇襲成りやすし":"晴 ☀"}　／　戦場 ${dst.kuni}`;
+  $("ma-name").textContent=`攻 ${a.ie}`; $("md-name").textContent=`守 ${d.ie}`;
+  $("ba-lab").textContent=`攻手 ${a.ie}軍（兵質${heishitsu(a.ie)}）`;
+  $("bd-lab").textContent=`守手 ${d.ie}軍（兵質${heishitsu(d.ie)}）`;
+  renderBattle(true);
+  if(playerIsAtk){
+    bmsg(`${d.ie}軍が野に布陣した。\nいかなる陣立てで攻めかかる？`);
+    bmenu([["突撃",()=>chooseTactic("突撃"),true],["包囲",()=>chooseTactic("包囲")],
+           ["挟み撃ち",()=>chooseTactic("挟み撃ち")],["奇襲",()=>chooseTactic("奇襲")]]);
+  } else {
+    chooseTactic(aiPickTactic(a,d)); // 敵が攻め手
+  }
+}
+
+function buildArmy(bushoList, ie, teppo){
+  // 兵>0の武将のみ。中央(総大将優先)・右備・左備・後詰へ配置
+  const list=bushoList.filter(b=>b.hei>0).slice();
+  list.sort((x,y)=>(y.saku+y.sen+y.hei)-(x.saku+x.sen+x.hei));
+  const lead=list[0]||null;
+  const front={c:null,r:null,l:null}, rear=[];
+  if(lead){front.c=lead;}
+  let idx=1;
+  if(list[idx]){front.r=list[idx++];}
+  if(list[idx]){front.l=list[idx++];}
+  while(list[idx]) rear.push(list[idx++]);
+  const army={ie,lead,front,rear,teppo,teppoUsed:false,
+    all:()=>[front.r,front.c,front.l,...rear].filter(Boolean).filter(b=>b.hei>0)};
+  army.moraleMax=10+(lead?lead.sen+lead.saku:2)+totalHei(army);
+  army.morale=army.moraleMax;
+  return army;
+}
+const totalHei=army=>army.all().reduce((s,b)=>s+b.hei,0);
+// 包囲時の中核(中央+後詰)兵
+const coreHei=army=>[army.front.c,...army.rear].filter(Boolean).reduce((s,b)=>s+(b.hei>0?b.hei:0),0);
+
+// ---- 武将の顔アイコン（能力でドット絵生成） ----
+const faceCache={};
+function faceData(b){
+  if(faceCache[b.name])return faceCache[b.name];
+  const c=document.createElement("canvas");c.width=c.height=12;
+  const x=c.getContext("2d");
+  // 兜の色＝戦闘、面頬＝作戦、で簡易に
+  const hue=(hashStat(b.name,7)%360);
+  const skin="#e8c39e";
+  x.fillStyle="#000";x.fillRect(0,0,12,12);
+  // 兜
+  x.fillStyle=`hsl(${hue},55%,40%)`;x.fillRect(2,1,8,4);x.fillRect(1,3,10,2);
+  // 前立て（戦闘高いと金）
+  x.fillStyle=b.sen>=5?"#f7d51d":"#999";x.fillRect(5,0,2,2);
+  // 顔
+  x.fillStyle=skin;x.fillRect(3,5,6,5);
+  // 目
+  x.fillStyle="#000";x.fillRect(4,6,1,1);x.fillRect(7,6,1,1);
+  // 口（カリスマ高いと髭）
+  if(b.kari>=5){x.fillStyle="#3a2a1a";x.fillRect(4,8,4,1);}
+  faceCache[b.name]=c.toDataURL();
+  return faceCache[b.name];
+}
+
+// 一騎打ち用の大きな武者絵（32x32ドット・能力で意匠が変化）
+const bigFaceCache={};
+function bigFaceData(b){
+  if(bigFaceCache[b.name])return bigFaceCache[b.name];
+  const S0=32, c=document.createElement("canvas"); c.width=c.height=S0;
+  const x=c.getContext("2d");
+  const hue=hashStat(b.name,7)%360;
+  const armor=`hsl(${hue},50%,38%)`, armorD=`hsl(${hue},50%,26%)`, skin="#e8c39e", skinD="#c89c70";
+  const px=(cx,cy,w,h,col)=>{x.fillStyle=col;x.fillRect(cx,cy,w,h);};
+  // 背景透過
+  // 兜鉢
+  px(8,3,16,7,armor); px(6,6,20,4,armorD);
+  // 吹返し
+  px(4,7,3,5,armor); px(25,7,3,5,armor);
+  // 前立て（戦闘・作戦で意匠が変わる）
+  if(b.sen>=6){ px(14,0,4,4,"#f7d51d"); px(13,1,6,1,"#f7d51d"); } // 大鍬形（金）
+  else if(b.saku>=6){ px(15,0,2,4,"#d8d8d8"); px(13,2,6,1,"#d8d8d8"); } // 鋭い前立て
+  else { px(15,1,2,3,"#bbb"); }
+  // 顔
+  px(10,10,12,11,skin); px(9,12,1,7,skinD); px(22,12,1,7,skinD);
+  // 面頬（政治高いと髭の立派な面）
+  px(10,18,12,3,armorD);
+  // 目（戦闘高いと鋭い）
+  if(b.sen>=5){ px(12,14,3,1,"#000"); px(18,14,3,1,"#000"); }
+  else { px(12,14,2,2,"#000"); px(18,14,2,2,"#000"); }
+  // 鼻筋
+  px(15,15,2,3,skinD);
+  // 口・髭（カリスマ/政治で髭）
+  if(b.kari>=5||b.sei>=6){ px(11,19,10,2,"#2a1a0a"); px(13,21,6,2,"#2a1a0a"); }
+  else { px(14,19,4,1,"#7a4a3a"); }
+  // 胴（鎧）
+  px(7,21,18,9,armor); px(7,21,18,2,armorD);
+  // 草摺の段
+  px(7,25,18,1,armorD); px(7,28,18,1,armorD);
+  // 襟（カリスマ高いと金の縁）
+  px(13,20,6,2, b.kari>=5?"#f7d51d":"#8a1c00");
+  bigFaceCache[b.name]=c.toDataURL();
+  return bigFaceCache[b.name];
+}
+function unitHTML(b,isLead,isFront){
+  if(!b)return "";
+  const cls=["unit"];if(isLead)cls.push("lead");if(isFront)cls.push("front");if(b.hei<=0)cls.push("fallen");
+  return `<div class="${cls.join(' ')}">
+    <img class="face" src="${faceData(b)}" alt="">
+    <div class="un-nm">${b.name}</div>
+    <div class="un-hei">兵${Math.max(0,b.hei)}</div></div>`;
+}
+function renderArmyCols(army,pre){
+  const f=army.front;
+  $(pre+"-r").innerHTML=unitHTML(f.r,false,true);
+  $(pre+"-c").innerHTML=unitHTML(f.c,f.c===army.lead,true);
+  $(pre+"-l").innerHTML=unitHTML(f.l,false,true);
+  $(pre+"-rear").innerHTML=army.rear.map(b=>unitHTML(b,b===army.lead,false)).join("")||'<div style="color:#456;font-size:10px;">―</div>';
+}
+function renderBattle(noDelta){
+  renderArmyCols(B.a,"a"); renderArmyCols(B.d,"d");
+  const aw=Math.max(0,B.a.morale/B.a.moraleMax*100), dw=Math.max(0,B.d.morale/B.d.moraleMax*100);
+  $("ma-bar").style.width=aw+"%"; $("md-bar").style.width=dw+"%";
+  $("ma-txt").textContent=`士気 ${Math.max(0,Math.round(B.a.morale))} 兵 ${totalHei(B.a)}`;
+  $("md-txt").textContent=`士気 ${Math.max(0,Math.round(B.d.morale))} 兵 ${totalHei(B.d)}`;
+  if(!noDelta){
+    showDelta("ma-d",Math.round(B.a.morale-B.prevA));
+    showDelta("md-d",Math.round(B.d.morale-B.prevD));
+  } else { $("ma-d").textContent=""; $("md-d").textContent=""; }
+  B.prevA=B.a.morale; B.prevD=B.d.morale;
+}
+function showDelta(id,v){
+  const el=$(id);
+  if(v===0){el.textContent="±0";el.className="mdelta";return;}
+  el.textContent=(v>0?"▲+":"▼")+v;
+  el.className="mdelta "+(v>0?"up":"down");
+  const bar=id==="ma-d"?$("ma-bar").parentElement:$("md-bar").parentElement;
+  if(v<0){bar.classList.remove("shaking");void bar.offsetWidth;bar.classList.add("shaking");}
+}
+
+function bmsg(t){$("bmsg").textContent=t;}
+function bappend(t){$("bmsg").textContent+=t;}
+function bmenu(items){const m=$("bmenu");m.innerHTML="";
+  items.forEach(([lb,fn,acc])=>{const b=document.createElement("button");
+    b.textContent=lb;if(acc)b.classList.add("acc");b.onclick=()=>{seSel();fn();};m.appendChild(b);});}
+
+// ---- 陣形選択 ----
+function chooseTactic(t){
+  B.tactic=t; B.timer=0;
+  // 挟み撃ちはプレイヤーなら別働隊を選ばせる
+  if(t==="挟み撃ち" && B.playerIsAtk && B.a.rear.length){
+    bmsg("挟み撃ち――別働隊を誰に率いさせる？\n（作戦能力が高い武将ほど、別働隊が早く敵の後背を突く）");
+    bmenu(B.a.rear.map((b,i)=>[`${b.name}（作${b.saku} 兵${b.hei}）`,()=>setPincer(b)])
+      .concat([["総大将に任せる",()=>setPincer(null)]]));
+    return;
+  }
+  applyTactic(t,null);
+}
+function setPincer(detach){
+  B.detach=detach;
+  applyTactic("挟み撃ち",detach);
+}
+function applyTactic(t,detach){
+  let note=`【${t}】の陣。`;
+  if(t==="挟み撃ち"){
+    const cmdr=B.a.lead, dsk=detach?detach.saku:(cmdr?cmdr.saku:1);
+    // 総大将と別働隊将、両方の作戦が高いほど早い
+    const speed=Math.ceil(((cmdr?cmdr.saku:1)+dsk)/2);
+    B.timer=Math.max(1,5-speed);
+    note+=detach?`\n${detach.name}が別働隊を率いて迂回中。`:"\n総大将みずから別働隊を差配。";
+    note+=`到着まで${B.timer}手、それまで正面の攻めは細い…`;
+  }
+  if(t==="奇襲"){
+    // 奇襲の成否は総大将の作戦能力（原作準拠）
+    const lead=B.a.lead;
+    const chance=(lead?lead.saku:1)*9 + (B.rain?28:0);
+    if(rnd(100)<chance){B.timer=-3;note+="\n奇襲成功ッ！敵は浮足立った。数手は一方的に攻められる！";seOk();}
+    else {B.timer=2;B.a.morale-=Math.ceil(B.a.moraleMax*0.25);
+      note+="\n奇襲は見破られた…！味方の士気が大きく削がれた。";seNg();}
+  }
+  if(t==="包囲")note+="\n敵を囲み、毎手その士気を多く削る構え。中核(中央＋後詰)が崩れれば負け。";
+  if(t==="突撃")note+="\n小細工なし。兵を当てて押し込む堅実な構え。";
+  bmsg(note);
+  renderBattle();
+  fieldMenu();
+}
+function aiPickTactic(a,d){
+  const fr=a.all().length;
+  if(fr>=3 && a.lead.saku>=5 && totalHei(a)<=totalHei(d)) return "挟み撃ち";
+  if(fr>=2) return "包囲";
+  if(totalHei(a)<=totalHei(d)/2 && totalHei(a)<=7) return "奇襲";
+  return "突撃";
+}
+
+// ---- 戦況メニュー（プレイヤー手番） ----
+function fieldMenu(){
+  if(B.over)return;
+  if(B.playerIsAtk){
+    const items=[["攻めかかる",()=>resolveRound(false),true]];
+    if(B.a.rear.length)items.push(["後詰めを出す",pickRear]);
+    items.push(["意見を聞く",askOpinion]);
+    if(canDuel())items.push(["一騎討ちを挑む",challengeDuel]);
+    if(B.a.teppo>=4&&!B.a.teppoUsed&&!B.rain)items.push(["鉄砲",()=>fireGuns(B.a,B.d)]);
+    items.push(["見守る",()=>resolveRound(true)]);
+    items.push(["退却",retreat]);
+    bmenu(items);
+  } else {
+    const items=[["迎え撃つ",()=>resolveRound(false),true]];
+    if(B.d.rear.length)items.push(["後詰めを出す",pickRearDef]);
+    if(canDuel())items.push(["一騎討ちを挑む",challengeDuel]);
+    if(B.d.teppo>=4&&!B.d.teppoUsed&&!B.rain)items.push(["鉄砲",()=>fireGuns(B.d,B.a)]);
+    items.push(["退却",retreat]);
+    bmenu(items);
+  }
+}
+
+// ---- 後詰め（士気の駆け引きの核） ----
+function pickRear(){
+  const me=B.a;
+  bmsg("いずれの武将を前線へ繰り出す？\n（兵の多い武将なら士気上昇。兵が少ないと前線で削られ逆効果）");
+  bmenu(me.rear.map((b,i)=>[`${b.name}（兵${b.hei} 戦${b.sen}）`,()=>commitRear(me,i)])
+    .concat([["やめる",fieldMenu]]));
+}
+function pickRearDef(){
+  const me=B.d;
+  bmsg("守勢の後詰め、誰を出す？");
+  bmenu(me.rear.map((b,i)=>[`${b.name}（兵${b.hei}）`,()=>commitRear(me,i)])
+    .concat([["やめる",fieldMenu]]));
+}
+function commitRear(army,i){
+  const b=army.rear.splice(i,1)[0];
+  // 投入前の前線兵力
+  const frontHei=[army.front.r,army.front.c,army.front.l].filter(x=>x&&x.hei>0).reduce((s,x)=>s+x.hei,0);
+  // 空いている前線へ
+  const f=army.front;
+  if(!f.r||f.r.hei<=0)f.r=b; else if(!f.l||f.l.hei<=0)f.l=b; else army.rear.unshift(b);
+  // 原作式: 新規投入兵が既存前線兵より多いほど士気回復。投入0なら必ず低下
+  let eff;
+  if(b.hei<=0){ eff=-3; }                          // 兵0は確実に士気低下
+  else { eff = Math.round((b.hei - frontHei*0.5)); } // 新規兵が前線より多ければ大きく回復
+  army.morale = Math.min(army.moraleMax, army.morale + eff);
+  bmsg(`${b.name}、新手として前線へ！`+
+    (eff>0?`生気あふれ士気が${eff}上がった。`
+          :`兵が手薄で、かえって士気が${-eff}下がった…`));
+  seSel(); renderBattle();
+  setTimeout(()=>resolveRound(false),350);
+}
+
+// ---- 意見システム ----
+function askOpinion(){
+  const lead=B.a.lead;
+  const sk=lead?lead.saku:1;
+  if(rnd(100) < sk*4){ // 作戦能力が高いほど良い意見
+    const r=rnd(3);
+    if(r===0){const dmg=2+rnd(4);B.d.morale-=dmg+3;hurtArmy(B.d,dmg);
+      bmsg(`${lead.name}「新たな陣形を考え出しました」\n敵兵${dmg}を崩し士気を削いだ！`);}
+    else if(r===1){const dmg=1+rnd(3);hurtArmy(B.d,dmg+2);
+      bmsg(`${lead.name}「少人数で敵の後ろを脅かしましょう」\n敵兵${dmg+2}を討った！`);}
+    else {B.a.morale+=3+rnd(3);
+      bmsg(`${lead.name}「兵らの士気、まだ尽きておりませぬ」\n味方の士気が上がった！`);}
+    seOk();
+  } else {
+    bmsg(`${lead.name}「…今は良案が浮かびませぬ」`);
+  }
+  renderBattle();
+  bmenu([["攻めかかる",()=>resolveRound(false),true],["戻る",fieldMenu]]);
+}
+
+// ---- 鉄砲 ----
+function fireGuns(me,foe){
+  me.teppoUsed=true;
+  const dmg=Math.min(totalHei(foe),Math.ceil(me.teppo/2)+rnd(2));
+  hurtArmy(foe,dmg); foe.morale-=dmg*2;
+  beep(110,.22,"sawtooth",.06);setTimeout(()=>beep(90,.2,"sawtooth",.05),120);
+  bmsg(`${me.ie}軍、鉄砲を一斉に放った！\n敵兵${dmg}を撃ち倒し、士気を大きく削いだ！`);
+  renderBattle();
+  if(checkEnd())return;
+  bmenu([["続けて攻める",()=>resolveRound(false),true]]);
+}
+
+// ============ 一騎打ち（専用シーン） ============
+let D2=null;
+function canDuel(){
+  return B && !B.over && B.a.lead && B.d.lead && !B.a.leadDead && !B.d.leadDead
+    && B.a.lead.hei>0 && B.d.lead.hei>0;
+}
+function challengeDuel(){
+  // 危険を承知で挑むか確認
+  const mine=B.playerIsAtk?B.a.lead:B.d.lead;
+  const foe =B.playerIsAtk?B.d.lead:B.a.lead;
+  bmsg(`${mine.name} が ${foe.name} に一騎打ちを挑む。\n勝てば敵の総大将を討ち取り戦は決する。\nされど敗れれば我が大将が討たれる――挑むか？`);
+  bmenu([["いざ尋常に勝負",startDuel,true],["思いとどまる",fieldMenu]]);
+}
+const mienHP=b=>9+b.sen*2+Math.floor(b.un/4);
+function startDuel(){
+  const L=B.playerIsAtk?B.a.lead:B.d.lead; // プレイヤー側を左
+  const R=B.playerIsAtk?B.d.lead:B.a.lead;
+  D2={L,R,Lhp:mienHP(L),Rhp:mienHP(R),LhpMax:mienHP(L),RhpMax:mienHP(R),turn:1,
+      Lside:B.playerIsAtk?B.a:B.d, Rside:B.playerIsAtk?B.d:B.a};
+  $("battle").style.display="none"; $("duel").style.display="block";
+  $("dl-face").src=bigFaceData(L); $("dr-face").src=bigFaceData(R);
+  $("dl-name").textContent=`${L.name}（${D2.Lside.ie}）`;
+  $("dr-name").textContent=`${R.name}（${D2.Rside.ie}）`;
+  renderDuel();
+  dmsg(`${L.name} と ${R.name}、馬上にて相見える――\n「いざ、尋常に勝負！」`);
+  beep(440,.1);setTimeout(()=>beep(330,.12),130);
+  duelMenu();
+}
+function renderDuel(){
+  $("dl-hp").style.width=Math.max(0,D2.Lhp/D2.LhpMax*100)+"%";
+  $("dr-hp").style.width=Math.max(0,D2.Rhp/D2.RhpMax*100)+"%";
+}
+function dmsg(t){$("duel-msg").textContent=t;}
+function dmenu(items){const m=$("duel-menu");m.innerHTML="";
+  items.forEach(([lb,fn,acc])=>{const b=document.createElement("button");
+    b.textContent=lb;if(acc)b.classList.add("acc");b.onclick=()=>{seSel();fn();};m.appendChild(b);});}
+function duelMenu(){
+  dmenu([["斬りかかる",()=>duelRound("attack"),true],
+         ["受けて隙を狙う",()=>duelRound("guard")]]);
+}
+function clashAnim(side){
+  const fx=$("clashfx"); fx.classList.remove("go");void fx.offsetWidth;fx.classList.add("go");
+  const el=$(side==="L"?"duel-L":"duel-R"); el.classList.remove("attack");void el.offsetWidth;el.classList.add("attack");
+  beep(880,.04,"square",.05);setTimeout(()=>beep(170,.12,"sawtooth",.06),60);
+}
+function duelStrike(attB,defB,guard){
+  let dmg=1+rnd(3)+Math.floor(attB.sen/2);
+  if(rnd(30)<attB.un)dmg+=2;            // 会心
+  if(rnd(30)<defB.un)dmg=Math.max(0,dmg-2); // 見切り
+  if(guard)dmg=Math.max(0,dmg-1-rnd(2));    // 受けで被害減
+  return dmg;
+}
+function duelRound(mode){
+  // 戦闘＋運が高い方が先手
+  const Lfirst = (D2.L.sen+D2.L.un/3) >= (D2.R.sen+D2.R.un/3);
+  const seq = Lfirst?["L","R"]:["R","L"];
+  let txt="";
+  for(const s of seq){
+    if(D2.Lhp<=0||D2.Rhp<=0)break;
+    if(s==="L"){
+      const d=duelStrike(D2.L,D2.R,false);
+      D2.Rhp-=d; clashAnim("L");
+      txt+=`${D2.L.name}、斬り込む！ ${d} の手傷を負わせた\n`;
+    } else {
+      const d=duelStrike(D2.R,D2.L, mode==="guard");
+      D2.Lhp-=d; clashAnim("R");
+      txt+=`${D2.R.name}の返し！ ${d} の手傷を負った\n`;
+    }
+  }
+  D2.turn++; renderDuel(); dmsg(txt);
+  if(D2.Lhp<=0||D2.Rhp<=0){ dmenu([["決着",duelEnd,true]]); return; }
+  duelMenu();
+}
+function duelEnd(){
+  const Ldead=D2.Lhp<=0, Rdead=D2.Rhp<=0;
+  let txt="";
+  if(Ldead&&Rdead){
+    txt=`両者相討ち！ ${D2.L.name}と${D2.R.name}、ともに馬上より崩れ落ちた…`;
+    killBusho(D2.Lside,D2.L); killBusho(D2.Rside,D2.R); beep(220,.3);
+  } else if(Rdead){
+    txt=`${D2.R.name}を討ち取った！\n${D2.L.name}の武名、戦場に轟く！敵勢に動揺が走る。`;
+    killBusho(D2.Rside,D2.R);
+    D2.Lside.morale=Math.min(D2.Lside.moraleMax,D2.Lside.morale+8);
+    beep(523,.12);setTimeout(()=>beep(784,.2),140);
+  } else {
+    txt=`無念…${D2.L.name}、${D2.R.name}に討たれる！`;
+    killBusho(D2.Lside,D2.L);
+    D2.Rside.morale=Math.min(D2.Rside.moraleMax,D2.Rside.morale+8);
+    beep(220,.3);
+  }
+  dmsg(txt);
+  dmenu([["戦場へ戻る",()=>{
+    $("duel").style.display="none"; $("battle").style.display="block";
+    D2=null; bappendLater=undefined; renderBattle();
+    if(checkEnd())return; fieldMenu();
+  },true]]);
+}
+
+// ---- 1手の戦闘解決（士気中心） ----
+function resolveRound(passive){
+  if(B.over)return;
+  const A=B.a,D=B.d, t=B.tactic;
+  const aStr=armyPower(A), dStr=armyPower(D);
+
+  // 攻撃側の兵削り係数
+  let atkMul=1, defMul=1;
+  let aMoraleDrain=0, dMoraleDrain=0; // 相手の士気を直接削る量
+
+  if(t==="突撃"){ atkMul=1.25; }
+  else if(t==="包囲"){
+    // 包囲は敵士気を多めに削る（兵・武将多いほど効果大）
+    const enc=A.all().length>=3?1:0.6;
+    dMoraleDrain += (2+rnd(3))*enc + Math.floor(totalHei(A)/8);
+    atkMul=0.9;
+  }
+  else if(t==="挟み撃ち"){
+    if(B.timer>0){ atkMul=0.5; B.timer--;
+      if(B.timer===0){ A.morale+=4+Math.floor((A.lead?A.lead.saku:1)); 
+        bappendLater="別働隊が到着！味方の士気が高まった！"; }
+    } else { atkMul=1.5; dMoraleDrain+=2; }
+  }
+  else if(t==="奇襲"){
+    if(B.timer<0){ defMul=0.25; atkMul=1.3; dMoraleDrain+=3; B.timer++; }
+    else if(B.timer>0){ atkMul=0.6; B.timer--; }
+  }
+  if(passive){ atkMul*=0.25; }
+
+  // 兵損害（兵質・戦闘・乱数）
+  const dmgToD=Math.max(0,Math.round(aStr*atkMul*r2(0.6,1.3)/5));
+  const dmgToA=Math.max(0,Math.round(dStr*defMul*r2(0.6,1.3)/5));
+  hurtArmy(D,Math.min(dmgToD,totalHei(D)));
+  hurtArmy(A,Math.min(dmgToA,totalHei(A)));
+
+  // 士気変動: 兵を失うと士気が減る（これが主役）＋陣形ドレイン
+  D.morale -= dmgToD*1.4 + dMoraleDrain;
+  A.morale -= dmgToA*1.4 + aMoraleDrain;
+
+  let log=`第${B.turn}手　`;
+  log+=`敵兵 ${dmgToD} 討取り／味方兵 ${dmgToA} 損耗`;
+  if(dMoraleDrain>0)log+=`\n包囲が利き、敵士気をさらに ${Math.round(dMoraleDrain)} 削った`;
+  if(typeof bappendLater==="string"){log+="\n"+bappendLater;bappendLater=undefined;}
+  bmsg(log);
+  beep(330,.05);setTimeout(()=>beep(262,.05),70);
+  B.turn++;
+  renderBattle();
+  if(checkEnd())return;
+
+  // 敵手番（プレイヤー守勢でない側）はAIが応じ手を返さず、次の操作へ
+  fieldMenu();
+}
+let bappendLater;
+
+function armyPower(army){
+  const q=heishitsu(army.ie)/12; // 兵質倍率
+  let p=0;
+  army.all().forEach(b=>{ p += b.hei*(2+b.sen)*0.5; });
+  if(army.lead) p += army.lead.saku*0.6;
+  return p*q;
+}
+function hurtArmy(army,dmg){
+  // 前線優先で兵を削る。兵0の武将は運次第で討死
+  let pool=[army.front.r,army.front.c,army.front.l].filter(b=>b&&b.hei>0);
+  if(!pool.length)pool=army.all();
+  let guard=200;
+  while(dmg>0 && totalHei(army)>0 && guard-->0){
+    pool=pool.filter(b=>b.hei>0); if(!pool.length)pool=army.all().filter(b=>b.hei>0);
+    if(!pool.length)break;
+    const b=pool[rnd(pool.length)];
+    b.hei--; dmg--;
+    if(b.hei<=0 && rnd(34)>b.un){ killBusho(army,b); }
+  }
+}
+function killBusho(army,b){
+  b.fallen=true;
+  bappendLater=(bappendLater?bappendLater+" ":"")+`${b.name}、討死…！`;
+  // 総大将討死は致命
+  if(b===army.lead){ army.leadDead=true; }
+  // 配置から外す
+  if(army.front.r===b)army.front.r=null;
+  if(army.front.c===b)army.front.c=null;
+  if(army.front.l===b)army.front.l=null;
+  const ri=army.rear.indexOf(b);if(ri>=0)army.rear.splice(ri,1);
+  // 元の武将リストからも除去
+  b.hei=0;
+}
+
+// ---- 勝敗判定（5条件） ----
+function checkEnd(){
+  const A=B.a,D=B.d;
+  const defLose = totalHei(D)<=0 || D.morale<=0 || D.leadDead ||
+                  (B.tactic==="包囲" && coreHei(D)<=0);
+  const atkLose = totalHei(A)<=0 || A.morale<=0 || A.leadDead;
+  if(defLose && !atkLose){ winField(true); return true; }
+  if(atkLose){ winField(false); return true; }
+  return false;
+}
+function winField(atkWon){
+  B.over=true;
+  const A=B.a;
+  if(B.playerIsAtk){
+    if(atkWon){
+      if(A.lead && !A.leadDead) A.lead.kari=Math.min(7,A.lead.kari+1);
+      // 生存兵を出撃元へ書き戻し
+      writebackArmy(B.src,A);
+      bmsg("野戦に勝利！敵勢は城へ退いた。\n（勝利で総大将のカリスマが上がった）\n攻城戦に移る。");
+      beep(523,.1);setTimeout(()=>beep(659,.12),120);
+      B.phase="siege";
+      B.bouei=Math.max(1,B.dst.shiro);
+      // 守勢を城へ（城塞値まで兵が減る）
+      siegeMenu(); return;
+    } else {
+      if(A.lead && !A.leadDead) A.lead.kari=Math.max(1,A.lead.kari-1);
+      writebackArmy(B.src,A);
+      bmsg("敗北…！野戦に敗れ、兵を退いた。\n（敗北で総大将のカリスマが下がった）");
+      bmenu([["無念",endBattleReturn,true]]); return;
+    }
+  } else {
+    // プレイヤーが守勢
+    if(atkWon){ // 守りきれず
+      writebackArmy(B.dst,B.d);
+      bmsg(`${B.a.ie}軍に押し切られた！城へ退く。`);
+      B.phase="siege"; B.bouei=Math.max(1,B.dst.shiro);
+      // AI攻城は自動処理
+      bmenu([["籠城する",aiSiege,true]]); return;
+    } else {
+      writebackArmy(B.dst,B.d);
+      bmsg(`${B.d.ie}軍、敵を撃退した！見事な守りであった。`);
+      beep(523,.12);
+      bmenu([["勝鬨を上げる",endBattleReturn,true]]); return;
+    }
+  }
+}
+function writebackArmy(prov,army){
+  // 生存武将をその国の兵数に反映。討死した武将は除去。
+  prov.busho.forEach(b=>{ b.hei=Math.max(0,b.hei); });
+  prov.busho=prov.busho.filter(b=>!b.fallen && b.hei>=0);
+  prov.teppo += army.teppo;
+}
+
+// ---- 退却 ----
+function retreat(){
+  B.over=true;
+  const me=B.playerIsAtk?B.a:B.d;
+  const prov=B.playerIsAtk?B.src:B.dst;
+  hurtArmy(me,Math.min(totalHei(me),1+rnd(3)));
+  me.teppo=Math.max(0,me.teppo-1);
+  writebackArmy(prov,me);
+  bmsg("退却した。退き際に兵と鉄砲を失った…");
+  bmenu([["戻る",endBattleReturn,true]]);
+}
+
+// ============ 攻城戦 ============
+function siegeMenu(){
+  $("bt-ttl").textContent=`攻城戦　${B.dst.kuni}城　城塞値 ${B.bouei}`;
+  bmsg(`${B.dst.kuni}城を攻める。\n力攻め=作戦力で城を削る(兵損あり)／兵糧攻め=政治力で削る(兵損なし)／使い=無血開城を狙う`);
+  bmenu([["力攻め",siegeAssault,true],["兵糧攻め",siegeStarve],
+         ["使いを送る",siegeEnvoy],["兵を退く",()=>{B.over=true;writebackArmy(B.src,B.a);endBattleReturn();}]]);
+}
+function siegeAssault(){
+  const lead=B.a.lead, dn=Math.min(5,1+rnd(Math.max(1,Math.ceil((lead?lead.saku:1)/1.5))));
+  B.bouei-=dn; hurtArmy(B.a,Math.min(totalHei(B.a),rnd(3)));
+  beep(150,.16,"sawtooth",.06);
+  bmsg(`力攻め！城塞値を ${dn} 削った。`+(typeof bappendLater==="string"?"\n"+bappendLater:""));bappendLater=undefined;
+  checkSiege();
+}
+function siegeStarve(){
+  const lead=B.a.lead, dn=Math.min(6,1+Math.floor((lead?lead.sei:1)/2)+rnd(2)+Math.floor((S.year-1573)/15));
+  B.bouei-=dn;
+  bmsg(`兵糧攻め。城を囲み兵を減らさず城塞値を ${dn} 削った。`);
+  checkSiege();
+}
+function siegeEnvoy(){
+  const ratio=totalHei(B.a)/Math.max(1,B.bouei);
+  if(clanProvs(B.dst.owner).length>1 && (ratio>=2||rnd(100)<25)){
+    bmsg("使者の弁、城将の心を動かした。無血開城！");B.bouei=0;B.envoyOpen=true;checkSiege();
+  } else { bmsg("使者は追い返された…（複数国持ちの相手にのみ有効）"); siegeMenu(); }
+}
+function checkSiege(){
+  $("bt-ttl").textContent=`攻城戦　${B.dst.kuni}城　城塞値 ${Math.max(0,B.bouei)}`;
+  renderBattle();
+  if(B.bouei<=0){
+    bappend("\n\n城は落ちた！この国は我が手に！");
+    beep(523,.12);setTimeout(()=>beep(784,.2),140);
+    bmenu([["入城する",()=>captureProv(B.dst,B.src,true),true]]);
+  } else if(totalHei(B.a)<=0){
+    bmsg("攻め手の兵が尽きた…攻城は成らず。");
+    B.over=true;writebackArmy(B.src,B.a);
+    bmenu([["撤収",endBattleReturn,true]]);
+  } else siegeMenu();
+}
+function aiSiege(){
+  // プレイヤー守勢で落城処理（簡易）：城塞値ぶん耐える
+  const atk=B.a, def=B.d;
+  let bouei=B.dst.shiro, guard=40;
+  while(bouei>0 && totalHei(atk)>0 && guard-->0){
+    bouei-=Math.min(5,1+rnd(Math.max(1,(atk.lead?atk.lead.saku:1))));
+    hurtArmy(atk,rnd(2));
+  }
+  if(bouei<=0){
+    bmsg(`${B.dst.kuni}城、落城…！この国は奪われた。`);
+    captureProv(B.dst,B.src,false);
+  } else {
+    bmsg(`${B.dst.kuni}城は持ちこたえた！敵は囲みを解いて去った。`);
+    writebackArmy(B.dst,B.d);
+    bmenu([["やれやれ",endBattleReturn,true]]);
+  }
+}
+function captureProv(dst,src,byPlayer){
+  const loser=dst.owner;
+  // 敗将の運命: 大名以外は討死or浪人
+  dst.busho.forEach(b=>{
+    if(b===S.clans[loser].daimyo)return;
+    if(rnd(100)<35){S.ronin.push(b);log(`${b.name}は浪人に下った`);}
+  });
+  dst.busho=[];
+  dst.owner=byPlayer?S.player:src.owner;
+  dst.shiro=B.envoyOpen?dst.shiro:10; // 力攻め/兵糧で落とすと城塞値10、使いはそのまま
+  dst.teppo=0;
+  // 攻め手の生存軍を入城させる
+  if(B){ const winArmy=B.a;
+    const survivors=src.busho.filter(b=>b.hei>0&&!b.fallen);
+    // 半分を入城（残りは出撃国に残す簡易ルール）
+    const move=survivors.slice(0,Math.ceil(survivors.length/2));
+    move.forEach(b=>{const i=src.busho.indexOf(b);if(i>=0)src.busho.splice(i,1);dst.busho.push(b);});
+    dst.teppo+=winArmy.teppo;
+  }
+  if(!dst.busho.length){ // 必ず誰か入れる
+    const any=src.busho.find(b=>b.hei>0);
+    if(any){src.busho.splice(src.busho.indexOf(any),1);dst.busho.push(any);}
+    else dst.busho.push(mkBusho("ばんぺい",1,false));
+  }
+  // 滅亡判定
+  const rest=clanProvs(loser);
+  if(rest.length===0){ S.clans[loser].alive=false; log(`${loser}家、滅亡…`);
+    if(loser===S.player) return gameOver(false);
+  } else {
+    const dm=S.clans[loser].daimyo;
+    if(dm && !rest.some(p=>p.busho.includes(dm))){
+      rest[0].busho.push(dm); log(`${loser}の当主は${rest[0].kuni}へ落ち延びた`);
+    }
+  }
+  log(`${dst.kuni}は${dst.owner}家のものとなった`);
+  endBattleReturn();
+  if(clanProvs(S.player).length>=S.provs.length) gameOver(true);
+}
+function endBattleReturn(){
+  B=null; bappendLater=undefined;
+  $("battle").style.display="none"; $("main").style.display="block";
+  renderMap();
+  if(S.afterBattle){ const cb=S.afterBattle; S.afterBattle=null; return cb(); }
+  if(PHASES[S.phase] && PHASES[S.phase].startsWith("戦争")) phSenso("");
+  else startPhase();
+}
+
+
+// ============ 政略 ============
+function phSeiryaku(){
+  // 奥州では朝廷工作の代わりに、過半の国を握れば朝廷より奥羽探題に任じられる
+  const canKani = clanProvs(S.player).length >= Math.ceil(S.provs.length/2);
+  msg("政略を巡らす。"+(canKani?"\n奥羽の過半を制した今、朝廷に奥羽探題の官位を求められる":""));
+  const items=[
+    ["政略結婚（金5）",seiKekkon],
+    ["降伏勧告（金1）",seiKofuku],
+    ["寝返り（金5）",seiNegaeri],
+    ["忍者（金100）",seiNinja]];
+  if(canKani)items.unshift(["官位を求める",seiKani]);
+  items.push(["何もしない（次へ）",nextPhase,true]);
+  menu(items);
+}
+function pickClan(cb,label){
+  const others=Object.values(S.clans).filter(c=>c.alive&&c.ie!==S.player);
+  msg(label);
+  menu(others.slice(0,12).map(c=>[c.ie,()=>cb(c)]).concat([["やめる",phSeiryaku]]));
+}
+function seiKekkon(){ if(myClan().kane<5){seNg();return msg("金が足りぬ");}
+  pickClan(c=>{ myClan().kane-=5;
+    const ch=30+myClan().daimyo.kari*5;
+    if(rnd(100)<ch){myClan().allies.add(c.ie);c.allies.add(S.player);
+      seOk();msg(`${c.ie}家と縁組成立！同盟を結んだ`);log(`${c.ie}家と同盟`);}
+    else {seNg();msg(`${c.ie}家に断られた…`);}
+    menu([["次へ",phSeiryaku,true]]);
+  },"いずれの家と縁組する？");}
+function seiKofuku(){ if(myClan().kane<1){seNg();return msg("金が足りぬ");}
+  pickClan(c=>{ myClan().kane-=1;
+    const myP=clanProvs(S.player).length, cP=clanProvs(c.ie).length;
+    if(c.kani>myClan().kani){seNg();msg(`官位が上の${c.ie}家は降らぬ`);}
+    else if(myP>=cP*4&&rnd(100)<50){
+      clanProvs(c.ie).forEach(p=>p.owner=S.player); c.alive=false;
+      seOk();msg(`${c.ie}家、降伏！全領を併呑した`);log(`${c.ie}家が降伏`);
+      renderMap(); if(clanProvs(S.player).length>=S.provs.length)return gameOver(true);
+    } else {seNg();msg(`${c.ie}家は降伏を拒んだ`);}
+    menu([["次へ",phSeiryaku,true]]);
+  },"いずれの家に降伏を迫る？");}
+function seiNegaeri(){ if(myClan().kane<5){seNg();return msg("金が足りぬ");}
+  // 隣接敵国の武将一覧
+  const adjEnemies=[];
+  clanProvs(S.player).forEach(p=>p.adj.forEach(i=>{
+    const q=S.provs[i-1];
+    if(q.owner!==S.player)q.busho.forEach(b=>{
+      if(b!==S.clans[q.owner].daimyo&&!adjEnemies.find(e=>e.b===b))adjEnemies.push({b,q});});}));
+  if(!adjEnemies.length){seNg();return msg("引き抜ける武将が近隣にいない");}
+  msg("誰を引き抜く？（忠誠が低い者ほど成功しやすい）");
+  menu(adjEnemies.slice(0,8).map(e=>[`${e.b.name}（${e.q.owner}・忠${e.b.chu}）`,()=>{
+    myClan().kane-=5;
+    if(rnd(10)>=e.b.chu){ e.q.busho.splice(e.q.busho.indexOf(e.b),1);
+      const home=clanProvs(S.player)[0]; e.b.chu=5; home.busho.push(e.b);
+      seOk();msg(`${e.b.name}が寝返った！${home.kuni}に着任`);log(`${e.b.name}を引き抜いた`);}
+    else {seNg();msg(`${e.b.name}は応じなかった`);}
+    menu([["次へ",phSeiryaku,true]]);
+  }]).concat([["やめる",phSeiryaku]]));}
+function seiNinja(){ if(myClan().kane<100){seNg();return msg("金100が要る");}
+  pickClan(c=>{ myClan().kane-=100;
+    const fx=rnd(7);
+    const tp=clanProvs(c.ie)[0];
+    let t="";
+    if(fx===0&&tp){t=`忍び、${c.ie}の当主を暗殺！`;
+      tp.busho=tp.busho.filter(b=>b!==c.daimyo);c.daimyo=tp.busho[0]||mkBusho("かげむしゃ",1,true);}
+    else if(fx===1){t=`${c.ie}家の評判を落とした`;c.daimyo.kari=Math.max(1,c.daimyo.kari-2);}
+    else if(fx===2){t=`${c.ie}家の金蔵を荒らした`;c.kane=Math.floor(c.kane/2);}
+    else if(fx===3&&tp){t=`${c.ie}家の兵を減らした`;tp.busho.forEach(b=>b.hei=Math.max(1,b.hei-1));}
+    else if(fx===4&&tp){t=`${tp.kuni}の領内を荒らした`;tp.koku=Math.max(0,tp.koku-10);}
+    else if(fx===5){t="しくじった！当家の評判が落ちた…";myClan().daimyo.kari=Math.max(1,myClan().daimyo.kari-1);}
+    else t="忍びは何も成せず帰ってきた";
+    msg(t);log("忍者: "+t);
+    menu([["次へ",phSeiryaku,true]]);
+  },"いずれの家に忍びを放つ？");}
+function seiKani(){
+  myClan().kani=Math.min(9,3+Math.floor(clanProvs(S.player).reduce((s,p)=>s+p.koku,0)/120));
+  seOk();msg(`朝廷より官位を賜り、奥羽探題に任じられた（官位${myClan().kani}）。降伏勧告に有利。`);
+  log("奥羽探題に任じられた");
+  menu([["次へ",phSeiryaku,true]]);
+}
+
+// ============ 軍備 ============
+function phGunbi(){
+  msg("軍備を整える国を地図で選べ（武将の居る国のみ）");
+  S.mode="gunbi";
+  S.cands=clanProvs(S.player).filter(p=>p.busho.length>0).map(p=>p.id);
+  renderMap();
+  menu([["軍備を終える（次へ）",()=>nextPhase(),true]]);
+}
+function gunbiMenu(p){
+  const totalKoku=clanProvs(S.player).reduce((s,q)=>s+q.koku,0);
+  const totalHei2=clanProvs(S.player).reduce((s,q)=>s+provHei(q),0);
+  msg(`【${p.kuni}】金${myClan().kane}　石高${p.koku}　城${p.shiro}　砲${p.teppo}　俸禄${myClan().houroku}\n兵: `+p.busho.map(b=>`${b.name}${b.hei}`).join(" ")+`\n（兵の目安: 総石高÷10≒${Math.floor(totalKoku/10)}／現在の総兵${totalHei2}）`);
+  const items=[];
+  if(p.koku>0)items.push(["兵を雇う（兵1=金3）",()=>{
+    if(myClan().kane<3)return seNg();
+    myClan().kane-=3;p.busho[0].hei++;seOk();gunbiMenu(p);renderMap();}]);
+  if(myClan().houroku<9)items.push([`俸禄を上げる（→${myClan().houroku+1}・金${myClan().houroku*5}）`,()=>{
+    const c=myClan().houroku*5;
+    if(myClan().kane<c)return seNg();
+    myClan().kane-=c;myClan().houroku++;seOk();log(`俸禄を${myClan().houroku}に上げた（謀反・出奔が減る）`);gunbiMenu(p);}]);
+  items.push(["城の強化（金15）",()=>{
+    const cost=Math.max(5,15-p.busho[0].sei);
+    if(myClan().kane<cost)return seNg();
+    myClan().kane-=cost;p.shiro=Math.min(70,p.shiro+5);seOk();gunbiMenu(p);}]);
+  items.push(["鉄砲購入（金25）",()=>{
+    if(myClan().kane<25)return seNg();
+    myClan().kane-=25;p.teppo++;seOk();gunbiMenu(p);}]);
+  if(S.ronin.length)items.push([`家臣を雇う（浪人${S.ronin.length}名）`,()=>{
+    const b=S.ronin[0];
+    msg(`浪人 ${b.name}（作${b.saku}戦${b.sen}政${b.sei}）が仕官を望んでいる`);
+    menu([["召し抱える（金10）",()=>{
+      if(myClan().kane<10)return seNg();
+      myClan().kane-=10;S.ronin.shift();b.chu=5;b.hei=Math.max(1,b.hei);p.busho.push(b);
+      seOk();log(`${b.name}を召し抱えた`);gunbiMenu(p);}],
+      ["断る",()=>gunbiMenu(p)]]);}]);
+  items.push(["この国を終える",()=>startGunbiBack()]);
+  menu(items);
+}
+function startGunbiBack(){
+  S.mode="gunbi"; S.sel=null;
+  S.cands=clanProvs(S.player).filter(p=>p.busho.length>0).map(p=>p.id);
+  renderMap();
+  msg("軍備を整える国を地図で選べ（武将の居る国のみ）");
+  menu([["軍備を終える（次へ）",()=>nextPhase(),true]]);
+}
+
+// ============ 年末処理：AIターン ============
+function endOfYear(){
+  msg("諸国も動いている…");
+  S.pendingAttacks=[]; // プレイヤーへの攻撃を貯める
+  Object.values(S.clans).forEach(c=>{
+    if(!c.alive||c.ie===S.player)return;
+    const ps=clanProvs(c.ie); if(!ps.length){c.alive=false;return;}
+    // 内政・税収
+    ps.forEach(p=>{p.koku=Math.min(p.kokuMax,p.koku+3+rnd(5));});
+    c.kane+=Math.floor(ps.reduce((s,p)=>s+p.koku,0)*1.4)-ps.reduce((s,p)=>s+provHei(p),0)*1 - ps.reduce((s,p)=>s+p.busho.length,0)*(c.houroku||1);
+    c.kane=Math.max(0,c.kane);
+    // 徴兵
+    ps.forEach(p=>{if(p.busho.length&&c.kane>=8&&p.koku>0){c.kane-=8;p.busho[0].hei+=2;}});
+    // 侵攻判定（年1回・雪国は冬を考慮し確率減）
+    if(rnd(100)<55){
+      let best=null;
+      ps.forEach(p=>{ if(provHei(p)<2)return;
+        p.adj.forEach(i=>{const q=S.provs[i-1];
+          if(q.owner===c.ie||c.allies.has(q.owner))return;
+          if(provHei(p)>=provHei(q)*1.6+2){
+            if(p.snow&&rnd(100)<40)return; // 雪国は出兵しにくい
+            if(!best||provHei(q)<provHei(best.q))best={p,q};}});});
+      if(best&&c.kane>=provHei(best.p)*2){
+        c.kane-=provHei(best.p)*2;
+        if(best.q.owner===S.player){ S.pendingAttacks.push({src:best.p,dst:best.q,c}); }
+        else aiResolveAuto(best.p,best.q,c);
+      }
+    }
+  });
+  renderMap();
+  // プレイヤーへの攻撃があれば対話的防衛戦を順に処理し、終わってから新年へ
+  resolvePendingThenAdvance();
+}
+function resolvePendingThenAdvance(){
+  if(S.pendingAttacks && S.pendingAttacks.length){
+    const atk=S.pendingAttacks.shift();
+    if(atk.dst.owner!==S.player || provHei(atk.dst)<=0){ // 既に失陥/無人なら自動
+      aiResolveAuto(atk.src,atk.dst,atk.c); return resolvePendingThenAdvance();
+    }
+    log(`【急報】${atk.c.ie}軍が${atk.dst.kuni}へ来襲！迎え撃て！`);
+    S.afterBattle=resolvePendingThenAdvance; // 戦闘後にここへ戻る
+    startBattle(atk.src,atk.dst,false); // プレイヤー守勢
+    return;
+  }
+  // 全戦闘終了 → 新年
+  S.afterBattle=null;
+  S.year++; S.phase=0;
+  renderMap();
+  log(`―― ${S.year}年 春 ――`);
+  if(!clanProvs(S.player).length)return gameOver(false);
+  startPhase();
+}
+// AI同士の即時決着
+function aiResolveAuto(src,dst,c){
+  const atk=provHei(src)*r2(0.7,1.3)*(heishitsu(c.ie)/12);
+  const def=(provHei(dst)*r2(0.9,1.5)+dst.shiro/8)*(heishitsu(dst.owner)/12);
+  if(atk>def){
+    const loser=dst.owner;
+    dst.busho=[];dst.owner=c.ie;dst.shiro=Math.max(5,Math.floor(dst.shiro/2));
+    const mv=src.busho.splice(Math.ceil(src.busho.length/2));dst.busho.push(...mv);
+    if(!dst.busho.length&&src.busho.length>0)dst.busho.push(src.busho.pop());
+    if(!dst.busho.length)dst.busho.push(mkBusho("ばんぺい",1,false));
+    log(`${c.ie}軍、${loser}領${dst.kuni}を攻略`);
+    if(!clanProvs(loser).length){S.clans[loser].alive=false;log(`${loser}家、滅亡`);}
+  } else { hurtProv(src,1); log(`${c.ie}軍、${dst.kuni}攻めに失敗`); }
+}
+function hurtProv(p,n){
+  while(n>0&&provHei(p)>0){
+    const alive=p.busho.filter(b=>b.hei>0); if(!alive.length)break;
+    const b=alive[rnd(alive.length)];
+    b.hei--;n--; if(b.hei<=0)p.busho.splice(p.busho.indexOf(b),1);
+  }
+}
+
+// ============ 勝敗 ============
+function gameOver(won){
+  $("battle").style.display="none";$("main").style.display="block";
+  S.mode=null;S.cands=null;renderMap();
+  if(won){
+    msg(`奥州統一！\n${S.year}年、${S.player}家は奥州全土を平定した。\n北の覇者、ここに立つ――`);
+    beep(523,.15);setTimeout(()=>beep(659,.15),160);setTimeout(()=>beep(784,.3),320);
+  } else {
+    msg(`${S.player}家は滅亡した…\n${S.year}年、その野望は奥羽の雪に消えた――`);
+    beep(330,.3);setTimeout(()=>beep(247,.5),320);
+  }
+  menu([["最初から",()=>location.reload(),true]]);
+}
+</script>
+</body>
+</html>
+
+
+
