@@ -1387,14 +1387,22 @@ function phGunbi(){
   renderMap();
   menu([["軍備を終える（次へ）",()=>nextPhase(),true]]);
 }
+function hireSoldierMenu(p){
+  msg(`【${p.kuni}】兵を増やす武将を選べ（兵1=金3）\n現在の金${myClan().kane}\n`+
+      p.busho.map(b=>`${b.name} 兵${b.hei}`).join("　"));
+  menu(p.busho.map(b=>[`${b.name}（兵${b.hei}）`,()=>{
+    if(myClan().kane<3)return seNg();
+    myClan().kane-=3;b.hei++;seOk();
+    log(`${p.kuni}で${b.name}の兵を1増やした`);
+    gunbiMenu(p);renderMap();
+  }]).concat([["戻る",()=>gunbiMenu(p)]]));
+}
 function gunbiMenu(p){
   const totalKoku=clanProvs(S.player).reduce((s,q)=>s+q.koku,0);
   const totalHei2=clanProvs(S.player).reduce((s,q)=>s+provHei(q),0);
   msg(`【${p.kuni}】金${myClan().kane}　石高${p.koku}　城${p.shiro}　砲${p.teppo}　俸禄${myClan().houroku}\n兵: `+p.busho.map(b=>`${b.name}${b.hei}`).join(" ")+`\n（兵の目安: 総石高÷10≒${Math.floor(totalKoku/10)}／現在の総兵${totalHei2}）`);
   const items=[];
-  if(p.koku>0)items.push(["兵を雇う（兵1=金3）",()=>{
-    if(myClan().kane<3)return seNg();
-    myClan().kane-=3;p.busho[0].hei++;seOk();gunbiMenu(p);renderMap();}]);
+  if(p.koku>0)items.push(["兵を雇う（武将を選ぶ・兵1=金3）",()=>hireSoldierMenu(p)]);
   if(myClan().houroku<9)items.push([`俸禄を上げる（→${myClan().houroku+1}・金${myClan().houroku*5}）`,()=>{
     const c=myClan().houroku*5;
     if(myClan().kane<c)return seNg();
